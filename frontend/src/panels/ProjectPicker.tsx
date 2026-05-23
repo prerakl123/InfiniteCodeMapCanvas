@@ -99,6 +99,7 @@ export default function ProjectPicker({ onClose }: ProjectPickerProps) {
 
   const status = useProjectStore((s) => s.status)
   const storeError = useProjectStore((s) => s.error)
+  const recoverable = useProjectStore((s) => s.recoverable)
   const indexingFraction = useProjectStore((s) => s.indexingFraction)
   const indexingCurrent = useProjectStore((s) => s.indexingCurrent)
   const projectId = useProjectStore((s) => s.projectId)
@@ -120,7 +121,7 @@ export default function ProjectPicker({ onClose }: ProjectPickerProps) {
     }
   }, [status, projectId, loadRoot, onClose])
 
-  const handleOpen = async () => {
+  const handleOpen = async (force = false) => {
     const trimmed = path.trim()
     if (!trimmed) {
       setLocalError('Please enter or browse to a project directory.')
@@ -130,7 +131,7 @@ export default function ProjectPicker({ onClose }: ProjectPickerProps) {
     localStorage.setItem(LS_KEY, trimmed)
     submittedRef.current = true
     resetGraph()
-    await openProject(trimmed)
+    await openProject(trimmed, force)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -200,9 +201,26 @@ export default function ProjectPicker({ onClose }: ProjectPickerProps) {
         )}
 
         {displayError && (
-          <p className="picker-error" role="alert">
-            {displayError}
-          </p>
+          <div className="picker-error-block" role="alert">
+            <p className="picker-error">{displayError}</p>
+            {(recoverable || status === 'error') && (
+              <div className="picker-error-actions">
+                <button
+                  className="picker-force-btn"
+                  onClick={() => void handleOpen(true)}
+                  disabled={isOpening || !path.trim()}
+                  title="Wipe the cached index for this project and re-build from scratch"
+                >
+                  Force re-index
+                </button>
+                <span className="picker-error-hint">
+                  {recoverable
+                    ? 'The cached index is incompatible. A force re-index will wipe it and rebuild.'
+                    : 'If this keeps happening, the cached index may be stale.'}
+                </span>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

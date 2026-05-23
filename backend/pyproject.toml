@@ -4,9 +4,12 @@ version = "0.1.0"
 description = "Interactive canvas mapping Python codebases as nested nodes and edges."
 requires-python = ">=3.11"
 dependencies = [
+    "blake3>=1.0.8",
     "fastapi>=0.136.1",
+    "jedi>=0.20.0",
     "pathspec>=1.1.1",
     "uvicorn[standard]>=0.47.0",
+    "watchdog>=6.0.0",
     "websockets>=16.0",
 ]
 

@@ -260,6 +260,51 @@
   font-size: 13px;
 }
 
+.picker-error-block {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.picker-error-block .picker-error {
+  margin: 0;
+}
+
+.picker-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.picker-force-btn {
+  background: #7c2d12;
+  border: 1px solid #b45309;
+  color: #fde68a;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.picker-force-btn:hover:not(:disabled) {
+  background: #9a3412;
+}
+
+.picker-force-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.picker-error-hint {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
 /* ── Indexing progress ───────────────────────────────────────────────────────── */
 
 .indexing-status {
@@ -578,4 +623,127 @@
   font-size: 11px;
   color: #6b7280;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Class node */
+.class-node {
+  padding: 10px 14px;
+  border-radius: 10px;
+  min-width: 180px;
+  position: relative;
+  background: #1e1b4b;
+  border: 1px solid #4338ca;
+  color: #e0e7ff;
+}
+
+/* Function (module-level) */
+.function-node {
+  padding: 8px 12px;
+  border-radius: 8px;
+  min-width: 160px;
+  position: relative;
+  background: #1c2415;
+  border: 1px solid #4d7c0f;
+  color: #d9f99d;
+}
+
+/* Method (function inside a class) — visually distinct */
+.method-node {
+  padding: 8px 12px;
+  border-radius: 8px;
+  min-width: 160px;
+  position: relative;
+  background: #2a1a0b;
+  border: 1px solid #b45309;
+  color: #fde68a;
+}
+
+/* External module */
+.external-node {
+  padding: 8px 12px;
+  border-radius: 999px;
+  min-width: 120px;
+  position: relative;
+  background: #1f1937;
+  border: 1px dashed #6b7280;
+  color: #cbd5e1;
+}
+
+/* Compound parent: fill the React Flow node wrapper that has explicit width/height
+   set in computeFlowNodes. Without this, the inner card stays at min-width and
+   children laid out at relative coords appear outside the visible card. */
+.node--compound {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.dir-node.node--compound {
+  background: rgba(31, 41, 55, 0.55);
+}
+
+.class-node.node--compound {
+  background: rgba(30, 27, 75, 0.45);
+}
+
+.node--compound .node-header,
+.node--compound .node-stats {
+  flex: 0 0 auto;
+}
+
+/* File parse-error state */
+.file-node--error {
+  border-color: #b91c1c !important;
+  background: #1f1010 !important;
+}
+
+.node-error {
+  color: #fca5a5 !important;
+}
+
+.node-badge {
+  background: #374151;
+  border-radius: 4px;
+  color: #cbd5e1;
+  font-size: 10px;
+  padding: 0 5px;
+  line-height: 16px;
+}
+
+/* Edge highlight (Phase 3 hover) */
+.react-flow__edge.edge-dim {
+  opacity: 0.15 !important;
+}
+
+.react-flow__edge.edge-highlight path {
+  stroke-width: 3 !important;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+/* Edge legend */
+.edge-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #cbd5e1;
+  margin-left: 8px;
+  flex-wrap: wrap;
+}
+
+.edge-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.edge-legend-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+  vertical-align: middle;
 }

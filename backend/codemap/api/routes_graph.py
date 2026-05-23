@@ -95,11 +95,34 @@ def get_children(node_id: str) -> dict:
         node = session.store.get_node(node_id)
         if node is not None:
             children = session.store.get_children(node_id)
-            all_ids = [node_id] + [c["id"] for c in children]
-            edges = session.store.get_edges_for_nodes(all_ids)
+            child_ids = [c["id"] for c in children]
+            edges = session.store.get_edges_among(child_ids + [node_id])
             return {
                 "nodes": [_node_from_dict(c).model_dump(by_alias=True) for c in children],
                 "edges": [_edge_from_dict(e).model_dump(by_alias=True) for e in edges],
             }
 
+    raise HTTPException(status_code=404, detail="Node not found")
+
+
+@router.get("/graph/neighbors/{node_id}")
+def get_neighbors(node_id: str) -> dict:
+    for session in registry._sessions.values():
+        node = session.store.get_node(node_id)
+        if node is not None:
+            edges = session.store.get_edges_for_nodes([node_id])
+            neighbor_ids: set[str] = set()
+            for e in edges:
+                neighbor_ids.add(e["source_id"])
+                neighbor_ids.add(e["target_id"])
+            neighbor_ids.discard(node_id)
+            neighbors = [
+                n
+                for n in (session.store.get_node(nid) for nid in neighbor_ids)
+                if n is not None
+            ]
+            return {
+                "nodes": [_node_from_dict(n).model_dump(by_alias=True) for n in neighbors],
+                "edges": [_edge_from_dict(e).model_dump(by_alias=True) for e in edges],
+            }
     raise HTTPException(status_code=404, detail="Node not found")

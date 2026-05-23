@@ -8,11 +8,12 @@ interface DirectoryNodeData {
   node: NodeResponse
   isExpanded: boolean
   hasChildren: boolean
+  isCompound: boolean
   [key: string]: unknown
 }
 
 function DirectoryNode({ data }: NodeProps) {
-  const { node, isExpanded } = data as DirectoryNodeData
+  const { node, isExpanded, isCompound } = data as DirectoryNodeData
   const expand = useGraphStore((s) => s.expand)
   const collapse = useGraphStore((s) => s.collapse)
 
@@ -34,7 +35,7 @@ function DirectoryNode({ data }: NodeProps) {
   }
 
   return (
-    <div className="dir-node">
+    <div className={isCompound ? 'dir-node node--compound' : 'dir-node'}>
       <Handle type="target" position={Position.Left} />
       <div className="node-header">
         <span className="node-icon" aria-hidden="true">📁</span>

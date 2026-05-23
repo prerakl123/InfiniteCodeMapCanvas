@@ -29,14 +29,30 @@ class Store:
         self._conn.close()
 
     def upsert_node(self, node: dict) -> None:
+        """Insert or update a node WITHOUT cascading deletes to its edges.
+
+        SQLite's INSERT OR REPLACE deletes the conflicting row before inserting,
+        and ON DELETE CASCADE on the edges FK then wipes every edge touching
+        the node. To keep edges intact, use ON CONFLICT DO UPDATE.
+        """
         meta = node.get("meta")
         meta_json = json.dumps(meta) if meta is not None else None
         with self._conn:
             self._conn.execute(
                 """
-                INSERT OR REPLACE INTO nodes
+                INSERT INTO nodes
                   (id, kind, name, qualname, path, parent_id, line_start, line_end, content_hash, meta)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  kind = excluded.kind,
+                  name = excluded.name,
+                  qualname = excluded.qualname,
+                  path = excluded.path,
+                  parent_id = excluded.parent_id,
+                  line_start = excluded.line_start,
+                  line_end = excluded.line_end,
+                  content_hash = excluded.content_hash,
+                  meta = excluded.meta
                 """,
                 (
                     node["id"],
@@ -50,6 +66,21 @@ class Store:
                     node.get("content_hash"),
                     meta_json,
                 ),
+            )
+
+    def update_node_meta(self, node_id: str, meta_patch: dict) -> None:
+        """Merge `meta_patch` into the existing meta of a node. UPDATE only."""
+        with self._conn:
+            row = self._conn.execute(
+                "SELECT meta FROM nodes WHERE id = ?", (node_id,)
+            ).fetchone()
+            if row is None:
+                return
+            existing = json.loads(row["meta"]) if row["meta"] else {}
+            existing.update(meta_patch)
+            self._conn.execute(
+                "UPDATE nodes SET meta = ? WHERE id = ?",
+                (json.dumps(existing), node_id),
             )
 
     def upsert_edge(self, edge: dict) -> None:
@@ -77,16 +108,36 @@ class Store:
             self._conn.execute("DELETE FROM nodes WHERE id = ?", (node_id,))
 
     def bulk_replace_file(self, file_path: str, nodes: list[dict], edges: list[dict]) -> None:
+        """Atomically replace all nodes/edges for a file path.
+
+        Uses ON CONFLICT DO UPDATE for the per-node upserts so that we don't
+        cascade-delete edges referring to nodes from OTHER files (e.g. a class
+        in this file inheriting from an in-project base; we keep the inheriting
+        edge).
+        """
         with self._conn:
+            # Delete only the rows that belong to this file. The CASCADE will
+            # remove edges where source/target lived in this file — that is
+            # intended; we'll rewrite them.
             self._conn.execute("DELETE FROM nodes WHERE path = ?", (file_path,))
             for node in nodes:
                 meta = node.get("meta")
                 meta_json = json.dumps(meta) if meta is not None else None
                 self._conn.execute(
                     """
-                    INSERT OR REPLACE INTO nodes
+                    INSERT INTO nodes
                       (id, kind, name, qualname, path, parent_id, line_start, line_end, content_hash, meta)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                      kind = excluded.kind,
+                      name = excluded.name,
+                      qualname = excluded.qualname,
+                      path = excluded.path,
+                      parent_id = excluded.parent_id,
+                      line_start = excluded.line_start,
+                      line_end = excluded.line_end,
+                      content_hash = excluded.content_hash,
+                      meta = excluded.meta
                     """,
                     (
                         node["id"],
@@ -146,6 +197,41 @@ class Store:
         rows = self._conn.execute(
             f"SELECT * FROM edges WHERE source_id IN ({placeholders}) OR target_id IN ({placeholders})",
             node_ids + node_ids,
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_edges_among(self, node_ids: list[str]) -> list[dict]:
+        """Edges whose source AND target are both in node_ids."""
+        if not node_ids:
+            return []
+        placeholders = ",".join("?" * len(node_ids))
+        rows = self._conn.execute(
+            f"SELECT * FROM edges WHERE source_id IN ({placeholders}) AND target_id IN ({placeholders})",
+            node_ids + node_ids,
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_edges_by_path(self, path: str) -> list[dict]:
+        rows = self._conn.execute(
+            """
+            SELECT e.* FROM edges e
+            JOIN nodes n ON (n.id = e.source_id OR n.id = e.target_id)
+            WHERE n.path = ?
+            """,
+            (path,),
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def get_importers_of(self, imported_path: str) -> list[str]:
+        rows = self._conn.execute(
+            "SELECT importer_path FROM import_reverse WHERE imported_path = ?",
+            (imported_path,),
+        ).fetchall()
+        return [r["importer_path"] for r in rows]
+
+    def get_nodes_by_path(self, path: str) -> list[dict]:
+        rows = self._conn.execute(
+            "SELECT * FROM nodes WHERE path = ?", (path,)
         ).fetchall()
         return [_row_to_dict(r) for r in rows]
 
