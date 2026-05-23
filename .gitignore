@@ -1,0 +1,8 @@
+.idea
+.vscode
+.venv
+venv
+
+node_modules
+.claude
+generated-docs
