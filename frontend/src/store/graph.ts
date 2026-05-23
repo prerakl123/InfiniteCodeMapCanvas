@@ -533,32 +533,44 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       const kids = childrenOf.get(parentId) ?? []
       if (!kids.length) continue
 
-      // Cell dimensions = the largest child + gap. Uniform-cell grid is the
-      // simplest layout that guarantees no overlap regardless of which kids
-      // are themselves expanded compounds.
-      let maxW = NODE_WIDTH
-      let maxH = NODE_HEIGHT
-      for (const k of kids) {
-        const sz = getSize(k.id)
-        if (sz.width > maxW) maxW = sz.width
-        if (sz.height > maxH) maxH = sz.height
-      }
-      const cellW = maxW + GRID_GAP_X
-      const cellH = maxH + GRID_GAP_Y
-      const cols = Math.max(1, Math.ceil(Math.sqrt(kids.length)))
+      // Shelf packing: variable-width rows. Each row's height = max child
+      // height in that row, so a single big compound child only inflates
+      // one row instead of every cell on the grid.
+      //
+      // Sort tallest-first so big children land at row starts and small
+      // ones fill in behind them. Target row width is chosen to give a
+      // roughly 1.5:1 (wider than tall) aggregate footprint.
+      const sized = kids.map((k) => ({ k, sz: getSize(k.id) }))
+      sized.sort((a, b) => b.sz.height - a.sz.height)
 
+      const widest = sized.reduce((m, s) => Math.max(m, s.sz.width), NODE_WIDTH)
+      const totalArea = sized.reduce(
+        (acc, s) => acc + (s.sz.width + GRID_GAP_X) * (s.sz.height + GRID_GAP_Y),
+        0,
+      )
+      const targetRowWidth = Math.max(widest, Math.sqrt(totalArea * 1.5))
+
+      let cursorX = COMPOUND_PAD
+      let cursorY = COMPOUND_HEADER
+      let rowHeight = 0
       let rightmost = 0
       let bottommost = 0
-      kids.forEach((child, idx) => {
-        const col = idx % cols
-        const row = Math.floor(idx / cols)
-        const x = col * cellW + COMPOUND_PAD
-        const y = row * cellH + COMPOUND_HEADER
-        newPositions.set(child.id, { x, y })
-        const cs = getSize(child.id)
-        rightmost = Math.max(rightmost, x + cs.width)
-        bottommost = Math.max(bottommost, y + cs.height)
-      })
+
+      for (const { k: child, sz } of sized) {
+        // Wrap when this child would push the row past the target, unless
+        // it's the first node in the row (in which case we accept the
+        // overflow — single very-wide child can't be split).
+        if (cursorX > COMPOUND_PAD && cursorX + sz.width > targetRowWidth + COMPOUND_PAD) {
+          cursorX = COMPOUND_PAD
+          cursorY += rowHeight + GRID_GAP_Y
+          rowHeight = 0
+        }
+        newPositions.set(child.id, { x: cursorX, y: cursorY })
+        rightmost = Math.max(rightmost, cursorX + sz.width)
+        bottommost = Math.max(bottommost, cursorY + sz.height)
+        cursorX += sz.width + GRID_GAP_X
+        if (sz.height > rowHeight) rowHeight = sz.height
+      }
 
       sizeOf.set(parentId, {
         width: Math.max(NODE_WIDTH + COMPOUND_PAD * 2, rightmost + COMPOUND_PAD),
