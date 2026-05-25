@@ -92,7 +92,10 @@ class IgnoreMatcher:
         except ValueError:
             return False
 
-        rel_str = str(rel)
+        # pathspec's gitwildmatch grammar expects forward-slash separators
+        # regardless of host OS; str(rel) yields backslashes on Windows and
+        # would silently fail patterns like "node_modules/" or "**/*.log".
+        rel_str = rel.as_posix()
 
         if self._gitignore_spec and self._gitignore_spec.match_file(rel_str):
             return True

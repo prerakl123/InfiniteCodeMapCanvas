@@ -12,6 +12,7 @@ from .graph_builder import (
 from .ids import make_node_id
 from .parser_python import PythonParser
 from ..event_bus import event_bus
+from ..paths import canonical_path_str
 
 if TYPE_CHECKING:
     from ..session import ProjectSession
@@ -33,7 +34,7 @@ def reindex_file(
     publish_events: bool = True,
 ) -> None:
     """Re-parse a single file and apply diffs to the store + publish WS events."""
-    path_str = str(file_path)
+    path_str = canonical_path_str(file_path)
     if not file_path.is_file():
         # Treat as removal.
         nodes = session.store.get_nodes_by_path(path_str)
@@ -53,7 +54,7 @@ def reindex_file(
     prior_nodes, prior_edges = _existing_state_for_file(session, path_str)
 
     # Need the file's parent directory node id
-    parent_dir = str(file_path.parent)
+    parent_dir = canonical_path_str(file_path.parent)
     parent_row = session.store._conn.execute(
         "SELECT id FROM nodes WHERE path = ? AND kind = 'directory'", (parent_dir,)
     ).fetchone()
@@ -119,7 +120,7 @@ def reindex_file(
             with session.store._conn:
                 if f_node_ids:
                     placeholders = ",".join("?" * len(f_node_ids))
-                    g_file_id = make_node_id(importer_path, "")
+                    g_file_id = make_node_id(canonical_path_str(importer_path), "")
                     session.store._conn.execute(
                         f"DELETE FROM edges WHERE source_id = ? AND target_id IN ({placeholders}) AND kind = 'imports'",
                         [g_file_id] + list(f_node_ids),

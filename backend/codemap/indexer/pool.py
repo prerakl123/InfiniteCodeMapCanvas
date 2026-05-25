@@ -11,6 +11,8 @@ from .parser_python import PythonParser
 
 def _parse_one(args: tuple[str, str]) -> ParseResult:
     """Worker entry point. Re-instantiates parser per process (no shared state)."""
+    from ..paths import canonical_path_str
+
     file_path_str, project_root_str = args
     parser = PythonParser()
     path = Path(file_path_str)
@@ -20,15 +22,16 @@ def _parse_one(args: tuple[str, str]) -> ParseResult:
         from .ids import make_node_id
         from .parser_base import ParsedNode
 
-        file_id = make_node_id(str(path), "")
+        canon = canonical_path_str(path)
+        file_id = make_node_id(canon, "")
         return ParseResult(
-            path=str(path),
+            path=canon,
             file_node=ParsedNode(
                 id=file_id,
                 kind="file",
                 name=path.name,
                 qualname=None,
-                path=str(path),
+                path=canon,
                 parent_id=None,
                 meta={"loc": 0, "parse_error": str(e)},
             ),
@@ -56,6 +59,8 @@ def parse_files_parallel(
         return []
 
     if len(files_list) < 16:
+        from ..paths import canonical_path_str
+
         parser = PythonParser()
         results: list[ParseResult] = []
         for f in files_list:
@@ -65,16 +70,17 @@ def parse_files_parallel(
                 from .ids import make_node_id
                 from .parser_base import ParsedNode
 
-                fid = make_node_id(str(f), "")
+                canon = canonical_path_str(f)
+                fid = make_node_id(canon, "")
                 results.append(
                     ParseResult(
-                        path=str(f),
+                        path=canon,
                         file_node=ParsedNode(
                             id=fid,
                             kind="file",
                             name=f.name,
                             qualname=None,
-                            path=str(f),
+                            path=canon,
                             parent_id=None,
                             meta={"loc": 0, "parse_error": str(e)},
                         ),

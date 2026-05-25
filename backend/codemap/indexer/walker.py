@@ -1,11 +1,32 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
 from .ignore import IgnoreMatcher
+
+# Windows' os.DirEntry.stat() always reports st_ino=0 and st_dev=0, which would
+# collapse the inode-based dedup below into "everything is the first entry".
+# On Windows we fall back to os.stat(), which queries the file index properly.
+_NEEDS_FULL_STAT = sys.platform == "win32"
+
+# os.path.isjunction was added in Python 3.12; on older interpreters we fall
+# back to a stat-based reparse-point check.
+_HAS_ISJUNCTION = hasattr(os.path, "isjunction")
+
+
+def _is_windows_junction(entry_path: str, stat_result) -> bool:
+    if not _NEEDS_FULL_STAT:
+        return False
+    if _HAS_ISJUNCTION:
+        return os.path.isjunction(entry_path)
+    # Fallback for Python 3.11: check the reparse-point bit directly.
+    import stat as _stat_mod
+    file_attrs = getattr(stat_result, "st_file_attributes", 0)
+    return bool(file_attrs & _stat_mod.FILE_ATTRIBUTE_REPARSE_POINT)
 
 
 @dataclass
@@ -38,11 +59,19 @@ def _walk_dir(
             continue
 
         try:
-            stat = entry.stat(follow_symlinks=False)
+            if _NEEDS_FULL_STAT:
+                stat = os.stat(entry.path, follow_symlinks=False)
+            else:
+                stat = entry.stat(follow_symlinks=False)
         except OSError:
             continue
 
         if entry.is_symlink():
+            continue
+        # Windows junctions are reparse points that don't always report as
+        # symlinks via entry.is_symlink(); skip them so we don't walk into
+        # OneDrive / WindowsApps loops.
+        if _is_windows_junction(entry.path, stat):
             continue
 
         inode_key = (stat.st_dev, stat.st_ino)

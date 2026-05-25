@@ -17,6 +17,10 @@ interface DirBrowserProps {
   initialPath: string
 }
 
+// Synthetic path the backend returns on Windows to mean "list of drives".
+// Must stay in sync with backend/codemap/api/routes_fs.py.
+const WINDOWS_DRIVES_TOKEN = '::drives::'
+
 function DirBrowser({ onSelect, initialPath }: DirBrowserProps) {
   const [browse, setBrowse] = useState<BrowseResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -40,6 +44,8 @@ function DirBrowser({ onSelect, initialPath }: DirBrowserProps) {
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const dirs = browse?.entries.filter((e) => e.isDir) ?? []
+  const isDrivesView = browse?.path === WINDOWS_DRIVES_TOKEN
+  const displayPath = isDrivesView ? 'This PC' : (browse?.path ?? '')
 
   return (
     <div className="dir-browser">
@@ -53,13 +59,14 @@ function DirBrowser({ onSelect, initialPath }: DirBrowserProps) {
             ↑ ..
           </button>
         )}
-        <span className="dir-browser-cwd" title={browse?.path ?? ''}>
-          {browse?.path ?? ''}
+        <span className="dir-browser-cwd" title={displayPath}>
+          {displayPath}
         </span>
         <button
           className="dir-browser-select"
           onClick={() => browse && onSelect(browse.path)}
-          disabled={!browse}
+          disabled={!browse || isDrivesView}
+          title={isDrivesView ? 'Pick a drive first' : undefined}
         >
           Select
         </button>

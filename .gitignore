@@ -6,3 +6,5 @@ venv
 node_modules
 .claude
 generated-docs
+
+__pycache__

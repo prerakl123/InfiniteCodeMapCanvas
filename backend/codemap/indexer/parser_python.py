@@ -431,7 +431,8 @@ class PythonParser(LanguageParser):
     def parse(
         self, file_bytes: bytes, file_path: Path, project_root: Path
     ) -> ParseResult:
-        path_str = str(file_path)
+        from ..paths import canonical_path_str
+        path_str = canonical_path_str(file_path)
         content_hash = hashlib.blake2b(file_bytes, digest_size=8).hexdigest()
 
         loc_total, loc_code, loc_blank, loc_comment = _compute_loc(file_bytes)

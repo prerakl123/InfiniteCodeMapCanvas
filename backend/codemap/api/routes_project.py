@@ -15,6 +15,7 @@ from ..indexer.ignore import IgnoreMatcher
 from ..indexer.parser_python import PythonParser
 from ..indexer.pool import parse_files_parallel
 from ..indexer.walker import walk
+from ..paths import canonical_path_str
 from ..session import IndexingState, ProjectSession, registry
 from ..stats import compute_stats
 from ..watcher import ProjectWatcher
@@ -44,21 +45,22 @@ def _run_indexing(session: ProjectSession) -> None:
         processed = 0
 
         # 1. Create the project root directory node.
-        root_id = make_node_id(str(root), "")
+        root_path_str = canonical_path_str(root)
+        root_id = make_node_id(root_path_str, "")
         root_node = {
             "id": root_id,
             "kind": "directory",
             "name": root.name,
-            "path": str(root),
+            "path": root_path_str,
             "parent_id": None,
             "meta": {"project_id": project_id, "child_counts": {}, "loc_total": 0},
         }
         session.store.upsert_node(root_node)
         processed += 1
         state.fraction = processed / total
-        state.current = str(root)
+        state.current = root_path_str
 
-        dir_ids: dict[str, str] = {str(root): root_id}
+        dir_ids: dict[str, str] = {root_path_str: root_id}
         py_files: list[tuple[Path, str, int, int]] = []  # (path, parent_dir_id, mtime, size)
 
         # 2. Walk and write directory + file nodes (without symbol info yet).
@@ -71,10 +73,10 @@ def _run_indexing(session: ProjectSession) -> None:
             enrich_with_jedi = None  # type: ignore
 
         for entry in entries:
-            path_str = str(entry.path)
+            path_str = canonical_path_str(entry.path)
             state.current = path_str
 
-            parent_str = str(entry.path.parent)
+            parent_str = canonical_path_str(entry.path.parent)
             parent_id = dir_ids.get(parent_str)
 
             if entry.is_dir:
@@ -141,11 +143,11 @@ def _run_indexing(session: ProjectSession) -> None:
         state.current = f"Parsing {len(py_files)} Python files…"
         py_paths = [t[0] for t in py_files]
         parse_results_raw = parse_files_parallel(py_paths, root)
-        meta_by_path = {str(t[0]): (t[1], t[2], t[3]) for t in py_files}
+        meta_by_path = {canonical_path_str(t[0]): (t[1], t[2], t[3]) for t in py_files}
 
         parse_results: list[tuple] = []  # (pr, fpath, mtime, size)
         for pr in parse_results_raw:
-            parent_id, mtime_ns, size = meta_by_path.get(pr.path, (None, 0, 0))
+            parent_id, mtime_ns, size = meta_by_path.get(canonical_path_str(pr.path), (None, 0, 0))
             graph_builder.write_parse_result(
                 session.store,
                 pr,

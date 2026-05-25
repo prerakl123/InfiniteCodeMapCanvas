@@ -11,6 +11,7 @@ from watchdog.observers import Observer
 
 from .indexer.ignore import IgnoreMatcher
 from .indexer.incremental import reindex_file
+from .paths import canonical_path_str
 
 if TYPE_CHECKING:
     from .session import ProjectSession
@@ -89,7 +90,10 @@ class ProjectWatcher:
                 pending: dict[str, Path] = {}
                 while self._queue:
                     p = self._queue.popleft()
-                    pending[str(p)] = p
+                    # Canonicalize so watchdog events with different casing or
+                    # path representation than the indexer's stored form still
+                    # collapse to the same dedup key and hit SQL exact-match.
+                    pending[canonical_path_str(p)] = p
             for path in pending.values():
                 try:
                     reindex_file(self._session, path)
